@@ -1,0 +1,14 @@
+mqtt:
+    host: localhost
+    port: 1883
+    client_id: 'kafka-forwarding-service-1'
+kafka:
+    bootstrap_server: localhost
+    port: 9092
+forwarding:
+    - name: foobar
+      mqtt:
+        topic: foo/bar/#
+      kafka:
+        topic: foobar
+      wrap_as_json: false

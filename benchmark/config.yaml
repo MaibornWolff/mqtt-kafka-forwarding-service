@@ -1,0 +1,14 @@
+mqtt:
+    host: localhost
+    port: 1883
+    client_id: 'benchmark'
+kafka:
+    bootstrap_server: localhost
+    port: 9092
+forwarding:
+    - name: benchmark
+      mqtt:
+        topic: stresstest
+      kafka:
+        topic: stresstest
+      wrap_as_json: false

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<hivemq>
+    <listeners>
+        <tcp-listener>
+            <port>1883</port>
+            <bind-address>0.0.0.0</bind-address>
+        </tcp-listener>
+    </listeners>
+    <mqtt>
+        <receive-maximum>
+            <server-receive-maximum>100</server-receive-maximum>
+        </receive-maximum>
+        <queued-messages>
+            <max-queue-size>1000000</max-queue-size>
+            <strategy>discard</strategy>
+        </queued-messages>
+    </mqtt>
+</hivemq>
