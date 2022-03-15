@@ -10,7 +10,7 @@ pub async fn create_stresstest_topic() {
     let client: AdminClient<DefaultClientContext> = ClientConfig::new()
         .set("bootstrap.servers", "localhost")
         .create()
-        .expect("Consumer creation error");
+        .expect("AdminClient creation error");
 
     let topics = [KAFKA_TOPIC];
     let opts = AdminOptions::new();
@@ -27,5 +27,5 @@ pub async fn create_stresstest_topic() {
     client
         .create_topics(&new_topics, &opts)
         .await
-        .expect("Error deleting topic");
+        .expect("Error creating topic");
 }
