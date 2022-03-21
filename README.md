@@ -33,22 +33,86 @@ The service can be configured via a yaml config file with the following structur
 
 ```yaml
 mqtt:
-    host: localhost # Host/DNS name of the MQTT broker
-    port: 1883 # Port of the MQTT broker
-    client_id: 'forwarding-service-1' # Client-ID to use, if not specified a clean session will be used
+  host: localhost # Host/DNS name of the MQTT broker
+  port: 1883 # Port of the MQTT broker
+  client_id: 'forwarding-service-1' # Client-ID to use, if not specified a clean session will be used
+  tls: # Optional, TLS-related config
+    ca_cert: # Path to a PEM-encoded cert to verify the presented broker certificate against, must be supplied if tls is set
+    client_key: # Path to a PEM-encoded client key to use for client authentication, optional, if set client_cert must also be set
+    client_cert: # Path to a PEM-encoded client cert to use for client authentication, optional, if set client_key mut also be set
+  credentials: # Optional
+    username: # Username to use for authentication
+    password: # Password to use for authentication
 kafka:
-    bootstrap_server: localhost # Host/DNS name of the kafka server
-    port: 9092 # Port of the kafk server
+  bootstrap_server: localhost # Host/DNS name of the kafka server
+  port: 9092 # Port of the kafk server
+  config: {}  # Key-Value pairs of extra config to supply to the Kafka Producer
 forwarding: # List of forwardings
-    - name: demo # A unique name
-      mqtt:
-        topic: 'demo/#' # MQTT topic to subscribe to, can be a wildcard
-      kafka:
-        topic: demo_data # Kafka topic to send data to
-      wrap_as_json: false # Should the payload be wrapped in a json object
+  - name: demo # A unique name
+    mqtt:
+      topic: 'demo/#' # MQTT topic to subscribe to, can be a wildcard
+    kafka:
+      topic: demo_data # Kafka topic to send data to
+    wrap_as_json: false # Should the payload be wrapped in a json object, optional, defaults to false
 ```
 
+Under `kafka.config` you can specify further options for the kafka producer (e.g. to configure SSL or authentication). This service uses [librdkafka](https://github.com/edenhill/librdkafka) so check its [CONFIGURATION.md](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for all possible configuration options.
+To securely provide sensitive information (e.g. a password) you can use environment variables in the config, by specifying `${ENVIRONMENT_VARIABLE}`. Note that this is not injection-safe in any way, so use it only with variables you control.
+
 By default the service will read the configuration from a file called `config.yaml` from the working directory. To use a different file set the environment variable `CONFIG_FILE` to its path.
+
+### TLS
+
+The forwarding-service can be configured to use TLS/SSL for both MQTT and Kafka connections. For both procotols you need the PEM-encoded CA certificate that has signed the server certificate and, if you want to do client certificate authentication, the PEM-encoded client certificate and key (for MQTT it has to be an RSA key).
+
+For MQTT you need to specify the following configuration:
+
+```yaml
+mqtt:
+  # ...
+  tls:
+    ca_cert: mqtt-ca.cert.pem
+    client_key: mqtt-client.cert.pem # Optional, only if client cert authentication is needed
+    client_cert: mqtt-client.key.pem # Optional, only if client cert authentication is needed
+```
+
+For Kafka you need to specifiy the following configuration:
+
+```yaml
+kafka:
+    # ...
+    config:
+      security.protocol: ssl
+      ssl.ca.location: kafka-ca.cert.pem
+      ssl.certificate.location: kafka-client.cert.pem # Optional, only if client cert authentication is needed
+      ssl.key.location: kafka-client.cert.pem # Optional, only if client cert authentication is needed
+```
+
+### Authentication
+
+The forwarding-service supports two ways for the service to authenticate itsself to MQTT and Kafka:
+
+Client certificate authentication: See [TLS](#TLS) above.
+
+Username/Password authentication:
+
+```yaml
+mqtt:
+  # ...
+  credentials:
+    username: forwardinguser
+    password: supersecretpassword
+kafka:
+    # ...
+    config:
+      security.protocol: SASL_SSL
+      sasl.mechanism: PLAIN
+      ssl.ca.location: kafka/ca.cert.pem
+      sasl.username: foobar
+      sasl.password: foopassword
+```
+
+Note that SASL GSSAPI is currently not supported out-of-the-box. If you need it, add the `gssapi` feature to the `rdkafka` dependency in `Cargo.toml` and rebuild. In this case you also need to provide custom docker build and base images that contain `libsasl`.
 
 ## Benchmark
 

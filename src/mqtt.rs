@@ -1,10 +1,11 @@
-use crate::config::{ForwardingConfig, MqttConfig};
+use crate::config::{ForwardingConfig, MqttConfig, MqttTlsConfig};
 use crate::kafka::KafkaClient;
 use log::info;
 use rumqttc::{
-    matches, AsyncClient, Event, EventLoop, MqttOptions, Packet, Publish, QoS, SubscribeFilter,
+    matches, AsyncClient, Event, EventLoop, Key, MqttOptions, Packet, Publish, QoS,
+    SubscribeFilter, TlsConfiguration, Transport,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::{
     sync::{
         atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering},
@@ -54,8 +55,26 @@ impl Stats {
     }
 }
 
+fn init_tls_transport(config: MqttTlsConfig) -> Transport {
+    let ca_cert = std::fs::read_to_string(&config.ca_cert).expect("Could not read CA cert file");
+    let client_auth = if config.client_cert.is_some() && config.client_key.is_some() {
+        let client_cert =
+           std::fs::read_to_string(config.client_cert.unwrap()).expect("Could not read client cert");
+        let client_key =
+            std::fs::read_to_string(config.client_key.unwrap()).expect("Could not read client key");
+        Some((client_cert.into_bytes(), Key::RSA(client_key.into_bytes())))
+    } else {
+        None
+    };
+    Transport::Tls(TlsConfiguration::Simple {
+        ca: ca_cert.into_bytes(),
+        alpn: None,
+        client_auth,
+    })
+}
+
 impl MqttClient {
-    pub fn new(
+    pub async fn new(
         config: &MqttConfig,
         forwardings: Vec<ForwardingConfig>,
         running: Arc<AtomicBool>,
@@ -67,20 +86,37 @@ impl MqttClient {
             .set_inflight(MAX_IN_FLIGHT)
             .set_manual_acks(true);
 
-        let (client, eventloop) = AsyncClient::new(mqttoptions, MAX_IN_FLIGHT as usize);
+        if let Some(tlsconfig) = config.tls.as_ref() {
+            log::debug!("Using TLS for MQTT connection");
+            mqttoptions.set_transport(init_tls_transport(tlsconfig.clone()));
+        }
+        if let Some(credentials) = config.credentials.as_ref() {
+            mqttoptions.set_credentials(&credentials.username, &credentials.password);
+        }
+
+        let (client, mut eventloop) = AsyncClient::new(mqttoptions, MAX_IN_FLIGHT as usize);
+
+        // Do one poll to check if the connection is established
+        match eventloop.poll().await {
+            Ok(_packet) => {},
+            Err(err) => {
+                panic!("Failed to connect to mqtt: {}", err);
+            }
+        }
+
         let topic_config = forwardings
             .iter()
-            .map(|forwarding_config| {
-                TopicMatch{mqtt_topic: forwarding_config.mqtt.topic.clone(), kafka_topic: forwarding_config.kafka.topic.clone(), wrap_as_json: forwarding_config.wrap_as_json.unwrap_or(false)}
-               
+            .map(|forwarding_config| TopicMatch {
+                mqtt_topic: forwarding_config.mqtt.topic.clone(),
+                kafka_topic: forwarding_config.kafka.topic.clone(),
+                wrap_as_json: forwarding_config.wrap_as_json.unwrap_or(false),
             })
             .collect::<Vec<TopicMatch>>();
 
         let stats = Arc::new(Stats::new());
-        let r = running.clone();
         let s = stats.clone();
         tokio::spawn(async move {
-            stats_reporter(r, s).await;
+            stats_reporter(running, s).await;
         });
 
         MqttClient {
@@ -92,10 +128,9 @@ impl MqttClient {
     }
 
     pub async fn subscribe(&mut self) {
-        let subscribe_filter = self
-            .topic_config
-            .iter()
-            .map(|topic_match| SubscribeFilter::new(topic_match.mqtt_topic.clone(), QoS::ExactlyOnce));
+        let subscribe_filter = self.topic_config.iter().map(|topic_match| {
+            SubscribeFilter::new(topic_match.mqtt_topic.clone(), QoS::ExactlyOnce)
+        });
         self.client
             .subscribe_many(subscribe_filter)
             .await
@@ -107,11 +142,11 @@ impl MqttClient {
             tokio::select! {
                 Ok(event) = self.eventloop.poll() => {
                     match event {
-                        Event::Incoming(packet) => match packet {
-                            Packet::Publish(publish) => {
-                                self.handle_publish(&kafka, publish).await;
-                            },
-                            _ => ()
+                        Event::Incoming(Packet::Publish(publish)) => {
+                            self.handle_publish(&kafka, publish).await;
+                        },
+                        Event::Incoming(Packet::SubAck(_)) => {
+                            info!("Subscribed to MQTT topics successfully");
                         },
                         _ => (),
                     }
@@ -142,14 +177,16 @@ impl MqttClient {
             let payload = publish.payload.as_ref();
             for topic in kafka_topics {
                 if topic.wrap_as_json {
-                    kafka_client.produce(&topic.kafka_topic, wrapped_payload.as_ref()).await;
+                    kafka_client
+                        .produce(&topic.kafka_topic, wrapped_payload.as_ref())
+                        .await;
                 } else {
                     kafka_client.produce(&topic.kafka_topic, payload).await;
                 }
                 stats.count_published.fetch_add(1, Ordering::Relaxed);
             }
             for _ in 0..5 {
-                if let Ok(_) = mqtt_client.ack(&publish).await {
+                if mqtt_client.ack(&publish).await.is_ok() {
                     return;
                 }
             }
@@ -162,11 +199,12 @@ impl MqttClient {
     }
 }
 
-fn matching_topics(mqtt_topic: &String, topic_config: &Vec<TopicMatch>) -> Vec<TopicMatch> {
+fn matching_topics(mqtt_topic: &str, topic_config: &[TopicMatch]) -> Vec<TopicMatch> {
     topic_config
         .iter()
-        .filter(|topic_match| matches(&mqtt_topic, &topic_match.mqtt_topic))
-        .map(|topic_match| topic_match.clone())
+        .filter(|topic_match| matches(mqtt_topic, &topic_match.mqtt_topic))
+        .cloned()
+        //.map(|topic_match| topic_match.clone())
         .collect::<Vec<TopicMatch>>()
 }
 
@@ -198,9 +236,11 @@ async fn stats_reporter(running: Arc<AtomicBool>, stats: Arc<Stats>) {
     }
 }
 
-
 fn wrap_payload(publish: &Publish) -> Vec<u8> {
     let payload = base64::encode(publish.payload.clone());
-    let obj = WrappedPayload{topic: publish.topic.clone(), payload: payload};
+    let obj = WrappedPayload {
+        topic: publish.topic.clone(),
+        payload,
+    };
     serde_json::to_vec(&obj).unwrap()
 }

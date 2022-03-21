@@ -1,4 +1,3 @@
-use ctrlc;
 use log::{info, LevelFilter};
 use simple_logger::SimpleLogger;
 use std::sync::{
@@ -17,7 +16,7 @@ async fn main() {
     let running = Arc::new(AtomicBool::new(true));
     let config = config::load_config();
     let kafka_client = kafka::KafkaClient::new(&config.kafka).await;
-    let mut mqtt_client = mqtt::MqttClient::new(&config.mqtt, config.forwarding, running.clone());
+    let mut mqtt_client = mqtt::MqttClient::new(&config.mqtt, config.forwarding, running.clone()).await;
 
     info!("Clients created. Subscribing to mqtt topics...");
     mqtt_client.subscribe().await;

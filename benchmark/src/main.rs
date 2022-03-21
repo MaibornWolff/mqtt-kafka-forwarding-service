@@ -100,7 +100,7 @@ fn print_stats(
         _ => ((received.len() as u128) * 1000) / receive_time_elapsed,
     };
 
-    if received.len() < count || not_received.len() > 0 {
+    if received.len() < count || !not_received.is_empty() {
         println!("WARNING: Not all messages received correctly")
     }
     println!("===========================================================");
