@@ -25,6 +25,8 @@ log = "0.4.14"
 simple_logger = "2.1.0"
 ctrlc = "3.2.1"
 base64 = "0.13.0"
+axum = {version="0.4.8"}
+prometheus-client = "0.15.1"
 
 
 [workspace]
