@@ -1,0 +1,86 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/maibornwolff/mqtt-kafka-forwarding-service
+  pullPolicy: IfNotPresent
+  tag: "dev"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+# LogLevel for the forwarding-service. Follows the RUST_LOG envlog standard. E.g. set to `debug` for more detailed logging
+logLevel: info
+
+# Config for the forwarding service. If not set you must provide and mount your own config and set the CONFIG_FILE environment variable
+config: null
+# Example config:
+# config: |
+#   mqtt:
+#     host: localhost
+#     port: 1883
+#     client_id: 'kafka-forwarding-service-1'
+#   kafka:
+#     bootstrap_server: localhost
+#     port: 9092
+#   forwarding:
+#     - name: foobar
+#       mqtt:
+#         topic: foo/bar/#
+#       kafka:
+#         topic: foobar
+#       wrap_as_json: false
+
+# List of environment variables to inject into the pod
+env: []
+# List of volumes, use this to provide certificates to the service
+volumes: []
+# List of volume mounts for the pod
+volumeMounts: []
+
+pod:
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+
+  ports:
+    - name: http
+      containerPort: 8080
+      protocol: TCP
+
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: http
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: http
+  resources:
+    limits:
+      cpu: 100m
+      memory: 128Mi
+    requests:
+      cpu: 100m
+      memory: 128Mi
+
+service:
+  enabled: true
+  type: ClusterIP
+  port: 8080
+  name: http
+  targetPort: http
+
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+

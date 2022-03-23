@@ -1,0 +1,6 @@
+apiVersion: v2
+name: mqtt-kafka-forwarding-service
+description: Helm chart to deploy the mqtt-kafka-forwarding-service
+type: application
+version: 0.0.1
+appVersion: "0.1.0"
