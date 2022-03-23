@@ -9,10 +9,36 @@ The service is written in Rust and has the following features:
 
 ## Quickstart
 
-The forwarding-service can be deployed as a docker image:
+The forwarding-service can be deployed in kubernetes using our helm chart:
+
+1. `helm repo add maibornwolff https://maibornwolff.github.io/mqtt-kafka-forwarding-service/`
+2. Create a values.yaml file with your configuration:
+
+      ```yaml
+      fullNameOverride: mqtt-kafka-forwarding-service
+      config: |  # Service configuration (see section "Configuration" below for details)
+        mqtt:
+          host: mqtt.default.svc.cluster.local  # DNS name of your mqtt broker
+          port: 1883
+          client_id: 'kafka-forwarding-service-1'
+        kafka:
+          bootstrap_server: kafka.default.svc.cluster.local  # DNS name of your kafka broker
+          port: 9092
+        forwarding:
+          - name: foobar
+            mqtt:
+              topic: foo/bar/#
+            kafka:
+              topic: foobar
+            wrap_as_json: false
+      ```
+
+3. `helm install mqtt-kafka-forwarding-service maibornwolff/mqtt-kafka-forwarding-service -f values.yaml`
+
+Or if you are running outside of Kubernetes the forwarding-service can be deployed as a docker image:
 
 1. Copy `config.yaml` to `my-config.yaml` and adapt it to your needs
-2. Run `docker run -v $(pwd)/my-config.yaml:/forwarding-service/config.yaml ghcr.io/maibornwolff/mqtt-kafka-forwarding-service:latest`
+2. Run `docker run -v $(pwd)/my-config.yaml:/forwarding-service/config.yaml ghcr.io/maibornwolff/mqtt-kafka-forwarding-service:0.1.0`
 
 ## Custom build
 
