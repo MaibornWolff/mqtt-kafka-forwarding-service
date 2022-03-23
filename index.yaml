@@ -1,0 +1,14 @@
+apiVersion: v1
+entries:
+  mqtt-kafka-forwarding-service:
+  - apiVersion: v2
+    appVersion: 0.1.0
+    created: "2022-03-23T10:30:37.054571954Z"
+    description: Helm chart to deploy the mqtt-kafka-forwarding-service
+    digest: 2d6ee5b529ba9a46d622115d55382f317354e4faaf76dc30e3136b5b3d28ed39
+    name: mqtt-kafka-forwarding-service
+    type: application
+    urls:
+    - https://MaibornWolff.github.io/mqtt-kafka-forwarding-service/mqtt-kafka-forwarding-service-0.1.0.tgz
+    version: 0.1.0
+generated: "2022-03-23T10:30:37.050961034Z"
