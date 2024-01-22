@@ -17,13 +17,13 @@ async fn health() -> &'static str {
 
 async fn metrics(
     Extension(metrics_registry): Extension<Arc<Mutex<Registry>>>,
-) -> (HeaderMap, Vec<u8>) {
+) -> (HeaderMap, String) {
     let mut headers = HeaderMap::new();
     headers.insert(
         CONTENT_TYPE,
         HeaderValue::from_static("application/openmetrics-text; version=1.0.0; charset=utf-8"),
     );
-    let mut buffer = vec![];
+    let mut buffer = String::new();
     let registry = metrics_registry.lock().unwrap();
     encode(&mut buffer, &registry).unwrap();
     (headers, buffer)
@@ -36,8 +36,6 @@ pub async fn api(metrics_registry: Registry) {
         .route("/metrics", get(metrics))
         .layer(Extension(Arc::new(Mutex::new(metrics_registry))));
 
-    axum::Server::bind(&"0.0.0.0:8080".parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080").await.unwrap();
+    axum::serve(listener, app).await.unwrap();
 }

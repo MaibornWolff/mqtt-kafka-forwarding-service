@@ -7,6 +7,7 @@ use rdkafka::{
 };
 use serde::{Serialize, Deserialize};
 use tokio::time::Instant;
+use base64::prelude::*;
 
 static TOPIC_NAME: &str = "stresstest";
 
@@ -76,7 +77,7 @@ impl BenchmarkConsumer {
 fn unwrap_message(payload: &[u8], wrapped_payload: bool) -> BenchmarkMessage {
     if wrapped_payload {
         let msg : WrappedPayload = serde_json::from_slice(payload).unwrap();
-        let payload = base64::decode(msg.payload).unwrap();
+        let payload = BASE64_STANDARD.decode(msg.payload).unwrap();
         serde_json::from_slice(payload.as_ref()).unwrap()
     } else {
         serde_json::from_slice(payload).unwrap()

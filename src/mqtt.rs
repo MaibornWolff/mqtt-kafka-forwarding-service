@@ -1,6 +1,6 @@
 use crate::config::{ForwardingConfig, MqttConfig, MqttTlsConfig};
 use crate::kafka::KafkaClient;
-use prometheus_client::encoding::text::Encode;
+use prometheus_client::encoding::EncodeLabelSet;
 use prometheus_client::metrics::counter::Counter;
 use prometheus_client::metrics::family::Family;
 use prometheus_client::metrics::gauge::Gauge;
@@ -17,10 +17,11 @@ use std::{
     },
     time::Duration,
 };
+use base64::prelude::*;
 
 static MAX_IN_FLIGHT: u16 = 10;
 
-#[derive(Clone, Hash, PartialEq, Eq, Encode)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug, EncodeLabelSet)]
 struct MetricLabels {
     topic: String,
 }
@@ -77,9 +78,9 @@ impl Metrics {
         let count_received = Family::<MetricLabels, Counter>::default();
         let count_published = Family::<MetricLabels, Counter>::default();
         let mqtt_connected = Gauge::default();
-        registry.register("forwarding_mqtt_received", "Number of messages received from mqtt", Box::new(count_received.clone()));
-        registry.register("forwarding_kafka_published", "Number of messages published to kafka", Box::new(count_published.clone()));
-        registry.register("forwarding_mqtt_connected", "Is the connection to the MQTT broker active", Box::new(mqtt_connected.clone()));
+        registry.register("forwarding_mqtt_received", "Number of messages received from mqtt", count_received.clone());
+        registry.register("forwarding_kafka_published", "Number of messages published to kafka", count_published.clone());
+        registry.register("forwarding_mqtt_connected", "Is the connection to the MQTT broker active", mqtt_connected.clone());
         mqtt_connected.set(1); // During initialization MQTT is always connected otherwise it wouldn't get to this point
 
         Metrics {
@@ -299,7 +300,7 @@ async fn stats_reporter(running: Arc<AtomicBool>, stats: Arc<Stats>) {
 }
 
 fn wrap_payload(publish: &Publish) -> Vec<u8> {
-    let payload = base64::encode(publish.payload.clone());
+    let payload = BASE64_STANDARD.encode(publish.payload.clone());
     let obj = WrappedPayload {
         topic: publish.topic.clone(),
         payload,
