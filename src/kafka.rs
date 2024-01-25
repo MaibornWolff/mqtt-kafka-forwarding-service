@@ -39,12 +39,12 @@ impl KafkaClient {
         self.producer.in_flight_count()
     }
 
-    pub async fn produce(&mut self, topic: &str, payload: &[u8]) {
+    pub async fn produce(&mut self, kafka_topic: &str, mqtt_topic: &str, payload: &[u8]) {
         for _ in 0..5 {
             let delivery_status = self
                 .producer
                 .send(
-                    FutureRecord::to(topic).payload(payload).key(&String::new()),
+                    FutureRecord::to(kafka_topic).payload(payload).key(mqtt_topic),
                     Duration::from_secs(1),
                 )
                 .await;

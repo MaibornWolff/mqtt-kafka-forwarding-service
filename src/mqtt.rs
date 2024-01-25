@@ -241,10 +241,10 @@ impl MqttClient {
             for topic in kafka_topics {
                 if topic.wrap_as_json {
                     kafka_client
-                        .produce(&topic.kafka_topic, wrapped_payload.as_ref())
+                        .produce(&topic.kafka_topic, &publish.topic, wrapped_payload.as_ref())
                         .await;
                 } else {
-                    kafka_client.produce(&topic.kafka_topic, payload).await;
+                    kafka_client.produce(&topic.kafka_topic, &publish.topic, payload).await;
                 }
                 metrics.count_published.get_or_create(&MetricLabels{topic: topic.kafka_topic}).inc();
                 stats.count_published.fetch_add(1, Ordering::Relaxed);
