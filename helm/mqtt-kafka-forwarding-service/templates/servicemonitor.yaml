@@ -1,0 +1,17 @@
+{{- if .Values.prometheus.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "fowarding.fullname" . }}
+  labels:
+    {{- include "fowarding.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "fowarding.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: {{ .Values.service.name }}
+    interval: {{ .Values.prometheus.interval | default "30s" }}
+    path: "/metrics"
+    scheme: HTTP
+{{- end }}

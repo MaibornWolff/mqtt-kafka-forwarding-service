@@ -1,6 +1,4 @@
-use log::{info, LevelFilter};
-use prometheus_client::registry::Registry;
-use simple_logger::SimpleLogger;
+use log::info;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -9,17 +7,19 @@ use std::sync::{
 mod api;
 mod config;
 mod kafka;
+mod metrics;
 mod mqtt;
 
 #[tokio::main(worker_threads = 8)]
 async fn main() {
-    SimpleLogger::new().with_level(LevelFilter::Info).env().init().unwrap();
-    let mut metrics_registry = <Registry>::default();
+    env_logger::init();
+    metrics::init_metrics().await;
 
     let running = Arc::new(AtomicBool::new(true));
     let config = config::load_config();
     let kafka_client = kafka::KafkaClient::new(&config.kafka).await;
-    let mut mqtt_client = mqtt::MqttClient::new(&config.mqtt, config.forwarding, running.clone(), &mut metrics_registry).await;
+    let mut mqtt_client =
+        mqtt::MqttClient::new(&config.mqtt, config.forwarding, running.clone()).await;
 
     info!("Clients created. Subscribing to mqtt topics...");
     mqtt_client.subscribe().await;
@@ -33,7 +33,7 @@ async fn main() {
     .expect("Error setting Crtl-C handler");
 
     info!("Starting HTTP API");
-    let _ = tokio::task::spawn(api::api(metrics_registry));
+    tokio::task::spawn(api::api());
 
     info!("Running forwarding");
     mqtt_client.run(kafka_client, running).await;

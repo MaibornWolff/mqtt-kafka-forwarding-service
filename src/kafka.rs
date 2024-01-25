@@ -25,7 +25,10 @@ impl KafkaClient {
             .create()
             .expect("KafkaProducer creation error");
         // Check for connection
-        match producer.client().fetch_metadata(None, rdkafka::util::Timeout::After(Duration::from_secs(5))) {
+        match producer
+            .client()
+            .fetch_metadata(None, rdkafka::util::Timeout::After(Duration::from_secs(5)))
+        {
             Ok(_) => (), // Got data, connection is established, nothing to do
             Err(err) => {
                 panic!("Could not establish connection to kafka: {}", err);
@@ -44,7 +47,9 @@ impl KafkaClient {
             let delivery_status = self
                 .producer
                 .send(
-                    FutureRecord::to(kafka_topic).payload(payload).key(mqtt_topic),
+                    FutureRecord::to(kafka_topic)
+                        .payload(payload)
+                        .key(mqtt_topic),
                     Duration::from_secs(1),
                 )
                 .await;

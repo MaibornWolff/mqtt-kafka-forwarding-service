@@ -1,4 +1,5 @@
 use crate::message::BenchmarkMessage;
+use crate::MQTT_TOPIC;
 use rumqttc::{AsyncClient, MqttOptions, QoS};
 use std::{
     sync::{
@@ -8,7 +9,6 @@ use std::{
     time::Duration,
 };
 use tokio::time::Instant;
-use crate::MQTT_TOPIC;
 
 pub struct BenchmarkProducer {
     messages: Vec<BenchmarkMessage>,
@@ -61,11 +61,7 @@ impl BenchmarkProducer {
             };
             let payload_string = serde_json::to_string(&message).unwrap();
             let payload: &[u8] = payload_string.as_ref();
-            match self
-                .client
-                .publish(MQTT_TOPIC, qos, true, payload)
-                .await
-            {
+            match self.client.publish(MQTT_TOPIC, qos, true, payload).await {
                 Ok(_) => {
                     self.messages.push(message);
                 }

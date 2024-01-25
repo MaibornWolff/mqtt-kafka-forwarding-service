@@ -1,10 +1,7 @@
 use crate::config::{ForwardingConfig, MqttConfig, MqttTlsConfig};
 use crate::kafka::KafkaClient;
-use prometheus_client::encoding::EncodeLabelSet;
-use prometheus_client::metrics::counter::Counter;
-use prometheus_client::metrics::family::Family;
-use prometheus_client::metrics::gauge::Gauge;
-use prometheus_client::registry::Registry;
+use crate::metrics::{MetricLabels, COUNT_KAFKA_PUBLISHED, COUNT_MQTT_RECEIVED, MQTT_CONNECTED};
+use base64::prelude::*;
 use rumqttc::{
     matches, AsyncClient, Event, EventLoop, Key, MqttOptions, Packet, Publish, QoS,
     SubscribeFilter, TlsConfiguration, Transport,
@@ -17,14 +14,8 @@ use std::{
     },
     time::Duration,
 };
-use base64::prelude::*;
 
 static MAX_IN_FLIGHT: u16 = 10;
-
-#[derive(Clone, Hash, PartialEq, Eq, Debug, EncodeLabelSet)]
-struct MetricLabels {
-    topic: String,
-}
 
 #[derive(Clone, Debug)]
 struct TopicMatch {
@@ -43,7 +34,6 @@ pub struct MqttClient {
     client: AsyncClient,
     eventloop: EventLoop,
     stats: Arc<Stats>,
-    metrics: Arc<Metrics>,
     topic_config: Vec<TopicMatch>,
 }
 
@@ -51,13 +41,6 @@ struct Stats {
     pub count_received: AtomicU64,
     pub count_published: AtomicU64,
     pub in_flight: AtomicI32,
-}
-
-struct Metrics {
-    count_received: Family<MetricLabels, Counter>,
-    count_published: Family<MetricLabels, Counter>,
-    mqtt_connected: Gauge,
-
 }
 
 impl Stats {
@@ -73,32 +56,19 @@ impl Stats {
     }
 }
 
-impl Metrics {
-    fn new(registry: &mut Registry) -> Metrics {
-        let count_received = Family::<MetricLabels, Counter>::default();
-        let count_published = Family::<MetricLabels, Counter>::default();
-        let mqtt_connected = Gauge::default();
-        registry.register("forwarding_mqtt_received", "Number of messages received from mqtt", count_received.clone());
-        registry.register("forwarding_kafka_published", "Number of messages published to kafka", count_published.clone());
-        registry.register("forwarding_mqtt_connected", "Is the connection to the MQTT broker active", mqtt_connected.clone());
-        mqtt_connected.set(1); // During initialization MQTT is always connected otherwise it wouldn't get to this point
-
-        Metrics {
-            count_received,
-            count_published,
-            mqtt_connected
-        }
-    }
-}
-
 fn init_tls_transport(config: MqttTlsConfig) -> Transport {
     let ca_cert = std::fs::read_to_string(&config.ca_cert).expect("Could not read CA cert file");
-    let client_auth = if config.client_cert.is_some() && config.client_key.is_some() {
-        let client_cert =
-           std::fs::read_to_string(config.client_cert.unwrap()).expect("Could not read client cert");
-        let client_key =
-            std::fs::read_to_string(config.client_key.unwrap()).expect("Could not read client key");
-        Some((client_cert.into_bytes(), Key::RSA(client_key.into_bytes())))
+
+    let client_auth = if let Some(client_cert) = config.client_cert {
+        let client_cert = std::fs::read_to_string(client_cert).expect("Could not read client cert");
+
+        if let Some(client_key) = config.client_key {
+            let client_key =
+                std::fs::read_to_string(client_key).expect("Could not read client key");
+            Some((client_cert.into_bytes(), Key::RSA(client_key.into_bytes())))
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -114,7 +84,6 @@ impl MqttClient {
         config: &MqttConfig,
         forwardings: Vec<ForwardingConfig>,
         running: Arc<AtomicBool>,
-        metrics_registry: &mut Registry,
     ) -> MqttClient {
         let mut mqttoptions =
             MqttOptions::new(config.client_id.clone(), config.host.clone(), config.port);
@@ -135,7 +104,7 @@ impl MqttClient {
 
         // Do one poll to check if the connection is established
         match eventloop.poll().await {
-            Ok(_packet) => {},
+            Ok(_packet) => {}
             Err(err) => {
                 panic!("Failed to connect to mqtt: {}", err);
             }
@@ -160,7 +129,6 @@ impl MqttClient {
             client,
             eventloop,
             stats,
-            metrics: Arc::new(Metrics::new(metrics_registry)),
             topic_config,
         }
     }
@@ -184,7 +152,7 @@ impl MqttClient {
                             self.handle_event(&kafka, event).await;
                         },
                         Err(err) => {
-                            let old = self.metrics.mqtt_connected.set(0);
+                            let old = MQTT_CONNECTED.set(0);
                             if old > 0 {
                                 log::warn!("Lost connection to MQTT: {}", err);
                             }
@@ -200,26 +168,30 @@ impl MqttClient {
     async fn handle_event(&mut self, kafka: &KafkaClient, event: Event) {
         match event {
             Event::Incoming(Packet::Publish(publish)) => {
-                self.handle_publish(&kafka, publish).await;
-            },
+                self.handle_publish(kafka, publish).await;
+            }
             Event::Incoming(Packet::SubAck(_)) => {
                 log::info!("Subscribed to MQTT topics successfully");
-            },
+            }
             Event::Incoming(Packet::ConnAck(_)) => {
                 log::info!("Reconnected to MQTT broker");
-                self.metrics.mqtt_connected.set(1);
-            },
+                MQTT_CONNECTED.set(1);
+            }
             Event::Incoming(Packet::Disconnect) => {
-                self.metrics.mqtt_connected.set(0);
+                MQTT_CONNECTED.set(0);
                 log::warn!("Got disconnect from MQTT broker");
-            },
+            }
             _ => (),
         }
     }
 
     async fn handle_publish(&mut self, kafka: &KafkaClient, publish: Publish) {
         self.stats.count_received.fetch_add(1, Ordering::Relaxed);
-        self.metrics.count_received.get_or_create(&MetricLabels{topic: publish.topic.clone()}).inc();
+        COUNT_MQTT_RECEIVED
+            .get_or_create(&MetricLabels {
+                topic: publish.topic.clone(),
+            })
+            .inc();
         let kafka_topics = matching_topics(&publish.topic, &self.topic_config);
 
         // Wait for in_flight messages to be low enough
@@ -234,7 +206,6 @@ impl MqttClient {
         let mqtt_client = self.client.clone();
         let mut kafka_client = kafka.clone();
         let stats = self.stats.clone();
-        let metrics = self.metrics.clone();
         tokio::spawn(async move {
             let wrapped_payload = wrap_payload(&publish);
             let payload = publish.payload.as_ref();
@@ -244,9 +215,15 @@ impl MqttClient {
                         .produce(&topic.kafka_topic, &publish.topic, wrapped_payload.as_ref())
                         .await;
                 } else {
-                    kafka_client.produce(&topic.kafka_topic, &publish.topic, payload).await;
+                    kafka_client
+                        .produce(&topic.kafka_topic, &publish.topic, payload)
+                        .await;
                 }
-                metrics.count_published.get_or_create(&MetricLabels{topic: topic.kafka_topic}).inc();
+                COUNT_KAFKA_PUBLISHED
+                    .get_or_create(&MetricLabels {
+                        topic: topic.kafka_topic,
+                    })
+                    .inc();
                 stats.count_published.fetch_add(1, Ordering::Relaxed);
             }
             for _ in 0..5 {
@@ -259,7 +236,10 @@ impl MqttClient {
     }
 
     pub async fn disconnect(&mut self) {
-        self.client.disconnect().await.unwrap();
+        self.client
+            .disconnect()
+            .await
+            .expect("Could not disconnect MQTT connection");
     }
 }
 
@@ -305,5 +285,5 @@ fn wrap_payload(publish: &Publish) -> Vec<u8> {
         topic: publish.topic.clone(),
         payload,
     };
-    serde_json::to_vec(&obj).unwrap()
+    serde_json::to_vec(&obj).expect("Could not wrap payload")
 }

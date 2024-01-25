@@ -77,6 +77,11 @@ service:
   name: http
   targetPort: http
 
+prometheus:
+  # Set to true to deploy a ServiceMonitor to have the forwarding service scraped for metrics
+  enabled: false
+  # Scrape internval
+  interval: 30s
 
 nodeSelector: {}
 

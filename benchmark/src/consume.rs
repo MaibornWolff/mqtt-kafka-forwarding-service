@@ -1,13 +1,13 @@
 use std::time::Duration;
 
 use crate::message::BenchmarkMessage;
+use base64::prelude::*;
 use rdkafka::{
     consumer::{Consumer, StreamConsumer},
     ClientConfig, Message, Offset, TopicPartitionList,
 };
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
-use base64::prelude::*;
 
 static TOPIC_NAME: &str = "stresstest";
 
@@ -55,7 +55,8 @@ impl BenchmarkConsumer {
                     if count == 1 {
                         start_instant = Instant::now();
                     }
-                    let message: BenchmarkMessage = unwrap_message(msg.payload().unwrap(), wrapped_payload);
+                    let message: BenchmarkMessage =
+                        unwrap_message(msg.payload().unwrap(), wrapped_payload);
                     let last = message.last;
                     if count == 1 && message.id != 0 {
                         println!("WARNING: First received message does have ID {} instead of 0. Message might be missing.\n", message.id);
@@ -73,10 +74,9 @@ impl BenchmarkConsumer {
     }
 }
 
-
 fn unwrap_message(payload: &[u8], wrapped_payload: bool) -> BenchmarkMessage {
     if wrapped_payload {
-        let msg : WrappedPayload = serde_json::from_slice(payload).unwrap();
+        let msg: WrappedPayload = serde_json::from_slice(payload).unwrap();
         let payload = BASE64_STANDARD.decode(msg.payload).unwrap();
         serde_json::from_slice(payload.as_ref()).unwrap()
     } else {

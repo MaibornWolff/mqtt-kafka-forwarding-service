@@ -6,12 +6,13 @@ The service is written in Rust and has the following features:
 
 * Guarantees At-Least-Once operations due to using manual acknowledgement in MQTT
 * Optionally wraps MQTT payloads in a json object which preserves the original topic (`{"topic": "foo/bar", "payload": "somebase64edpayload"}`). Can be useful if later processing steps need the original MQTT topic (e.g. if some device-id is encoded in the topic but not repeated in the payload)
+* Uses the MQTT topic as the kafka message key. This gives access to the topic even if the wrap option is not used and it makes sure messages from the same MQTT topic end up in the same kafka partition, preserving message ordering.
 
 ## Quickstart
 
 The forwarding-service can be deployed in kubernetes using our helm chart:
 
-1. `helm repo add maibornwolff https://maibornwolff.github.io/mqtt-kafka-forwarding-service/`
+1. `helm repo add forwarding https://maibornwolff.github.io/mqtt-kafka-forwarding-service/`
 2. Create a values.yaml file with your configuration:
 
       ```yaml
@@ -33,7 +34,7 @@ The forwarding-service can be deployed in kubernetes using our helm chart:
             wrap_as_json: false
       ```
 
-3. `helm install mqtt-kafka-forwarding-service maibornwolff/mqtt-kafka-forwarding-service -f values.yaml`
+3. `helm install mqtt-kafka-forwarding-service forwarding/mqtt-kafka-forwarding-service -f values.yaml`
 
 Or if you are running outside of Kubernetes the forwarding-service can be deployed as a docker image:
 
@@ -50,8 +51,7 @@ You can build your own custom binary by following these steps:
 
 To build your own docker image follow these steps:
 
-1. `docker run --rm -it -v cargo-cache:/root/.cargo/registry -v "$(pwd)":/volume clux/muslrust:1.59.0 cargo build --release`
-2. `docker build . -t <my-image-name>`
+1. `docker build . -t <my-image-name>`
 
 ## Configuration
 
@@ -118,7 +118,7 @@ kafka:
 
 The forwarding-service supports two ways for the service to authenticate itsself to MQTT and Kafka:
 
-Client certificate authentication: See [TLS](#TLS) above.
+Client certificate authentication: See [TLS](#tls) above.
 
 Username/Password authentication:
 
@@ -170,7 +170,7 @@ Performance was measured using the benchmark tool by repeatedly sending 1 millio
 
 Enabling the payload wrapping does not have any measurable impact on performance. Also HiveMQ is not the bottleneck, using QoS 1 the benchmark tool is able to publish about 9000 msg/s to the broker, so way more than the forwarding-service can process. Measuring the performance for QoS 0 was hard as at higher message rates messages get dropped (this is allowed in the specification and can happen in the broker or in the libraries on either the publisher or subscriber side due to overload). As such the provided number is one where no message drops happened. In some measurements about 10000 msg/s were possible without suffering losses, going higher increases the risk of dropped messages exponentially.
 
-We also created a Python implementation of the forwarding service (sourcecode not included in this repository) to compare performance and because python is more common in the company than Rust. We implemented two variants, one using the [confluent-kafka-python library](https://github.com/confluentinc/confluent-kafka-python) and one using the [kafka-python library](https://github.com/dpkp/kafka-python). At first glance the confluent library showed good peak performance of about 1200 msg/s for QoS 1. But when running the benchmark with more messages or severl times then quite quickly the message rate drops significantly to about 300 msg/s. A flamegraph analysis showed that most of the time is spent in kafka library code (communicating with and waiting for the broker), so we assume the performance drop is due to some behaviour of the library. Switching out the confluent library with the third-pary kafka-python library gives a stable performance but slower than the confluent library peak performance.
+We also created a Python implementation of the forwarding service (sourcecode not included in this repository) to compare performance and because python is more common in the company than Rust. We implemented two variants, one using the [confluent-kafka-python library](https://github.com/confluentinc/confluent-kafka-python) and one using the [kafka-python library](https://github.com/dpkp/kafka-python). At first glance the confluent library showed good peak performance of about 1200 msg/s for QoS 1. But when running the benchmark with more messages or several times then quite quickly the message rate drops significantly to about 300 msg/s. A flamegraph analysis showed that most of the time is spent in kafka library code (communicating with and waiting for the broker), so we assume the performance drop is due to some behaviour of the library. Switching out the confluent library with the third-pary kafka-python library gives a stable performance but slower than the confluent library peak performance.
 
 | QoS | confluent peak rate | confluent avg rate | kafka-python avg rate |
 |-----|---------------------|--------------------|-----------------------|

@@ -35,12 +35,12 @@ pub struct MqttCredentials {
 pub struct KafkaConfig {
     pub bootstrap_server: String,
     pub port: u16,
-    pub config: Option<HashMap<String,String>>,
+    pub config: Option<HashMap<String, String>>,
 }
 
 impl KafkaConfig {
     pub fn url_string(&self) -> String {
-        return format!("{}:{}", self.bootstrap_server, self.port);
+        format!("{}:{}", self.bootstrap_server, self.port)
     }
 }
 
@@ -76,7 +76,7 @@ pub fn load_config() -> Config {
     f.read_to_string(&mut contents)
         .expect("something went wrong reading the config file");
     contents = parse_config(contents);
-    serde_yaml::from_str(&contents).unwrap()
+    serde_yaml::from_str(&contents).expect("Could not parse config")
 }
 
 enum ParseState {
@@ -86,7 +86,7 @@ enum ParseState {
 }
 
 fn parse_config(mut content: String) -> String {
-    let mut vars: HashMap<String,Option<String>> = HashMap::new();
+    let mut vars: HashMap<String, Option<String>> = HashMap::new();
     let mut state = ParseState::NormalText;
     for char in content.chars() {
         state = match state {
@@ -96,14 +96,14 @@ fn parse_config(mut content: String) -> String {
                 } else {
                     ParseState::NormalText
                 }
-            },
+            }
             ParseState::DollarSign => {
                 if char == '{' {
                     ParseState::VarName(String::new())
                 } else {
                     ParseState::NormalText
                 }
-            },
+            }
             ParseState::VarName(mut buf) => {
                 if char == '}' {
                     vars.insert(buf, None);
@@ -123,7 +123,10 @@ fn parse_config(mut content: String) -> String {
         }
     }
     for (var, value) in vars {
-        content = content.replace(format!("${{{var}}}").as_str(), value.unwrap_or_else(String::new).as_str());
+        content = content.replace(
+            format!("${{{var}}}").as_str(),
+            value.unwrap_or_else(String::new).as_str(),
+        );
     }
     content
 }
