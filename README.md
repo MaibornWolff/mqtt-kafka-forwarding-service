@@ -5,15 +5,15 @@ A service that forwards messages from an MQTT broker to Kafka based on configura
 The service is written in Rust and has the following features:
 
 * Guarantees At-Least-Once operations due to using manual acknowledgement in MQTT
-* Optionally wraps MQTT payloads in a json object which preserves the original topic (`{"topic": "foo/bar", "payload": "somebase64edpayload"}`). Can be useful if later processing steps need the original MQTT topic (e.g. if some device-id is encoded in the topic but not repeated in the payload)
-* Uses the MQTT topic as the kafka message key. This gives access to the topic even if the wrap option is not used and it makes sure messages from the same MQTT topic end up in the same kafka partition, preserving message ordering.
+* Optionally wraps MQTT payloads in a JSON object which preserves the original topic (`{"topic": "foo/bar", "payload": "somebase64edpayload"}`). Can be useful if later processing steps need the original MQTT topic (e.g. if some device-id is encoded in the topic but not repeated in the payload)
+* Uses the MQTT topic as the Kafka message key. This gives access to the topic even if the wrap option is not used and it makes sure messages from the same MQTT topic end up in the same Kafka partition, preserving message ordering.
 
 ## Quickstart
 
-The forwarding-service can be deployed in kubernetes using our helm chart:
+The forwarding-service can be deployed in Kubernetes using our helm chart:
 
 1. `helm repo add forwarding https://maibornwolff.github.io/mqtt-kafka-forwarding-service/`
-2. Create a values.yaml file with your configuration:
+2. Create a `values.yaml` file with your configuration:
 
       ```yaml
       fullNameOverride: mqtt-kafka-forwarding-service
@@ -55,7 +55,7 @@ To build your own docker image follow these steps:
 
 ## Configuration
 
-The service can be configured via a yaml config file with the following structure:
+The service can be configured via a YAML config file with the following structure:
 
 ```yaml
 mqtt:
@@ -82,14 +82,14 @@ forwarding: # List of forwardings
     wrap_as_json: false # Should the payload be wrapped in a json object, optional, defaults to false
 ```
 
-Under `kafka.config` you can specify further options for the kafka producer (e.g. to configure SSL or authentication). This service uses [librdkafka](https://github.com/edenhill/librdkafka) so check its [CONFIGURATION.md](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for all possible configuration options.
+Under `kafka.config` you can specify further options for the Kafka producer (e.g. to configure SSL or authentication). This service uses [librdkafka](https://github.com/edenhill/librdkafka) so check its [CONFIGURATION.md](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md) for all possible configuration options.
 To securely provide sensitive information (e.g. a password) you can use environment variables in the config, by specifying `${ENVIRONMENT_VARIABLE}`. Note that this is not injection-safe in any way, so use it only with variables you control.
 
 By default the service will read the configuration from a file called `config.yaml` from the working directory. To use a different file set the environment variable `CONFIG_FILE` to its path.
 
 ### TLS
 
-The forwarding-service can be configured to use TLS/SSL for both MQTT and Kafka connections. For both procotols you need the PEM-encoded CA certificate that has signed the server certificate and, if you want to do client certificate authentication, the PEM-encoded client certificate and key (for MQTT it has to be an RSA key).
+The forwarding-service can be configured to use TLS/SSL for both MQTT and Kafka connections. For both protocols you need the PEM-encoded CA certificate that has signed the server certificate and, if you want to do client certificate authentication, the PEM-encoded client certificate and key (for MQTT it has to be an RSA key).
 
 For MQTT you need to specify the following configuration:
 
@@ -102,7 +102,7 @@ mqtt:
     client_cert: mqtt-client.key.pem # Optional, only if client cert authentication is needed
 ```
 
-For Kafka you need to specifiy the following configuration:
+For Kafka you need to specify the following configuration:
 
 ```yaml
 kafka:
@@ -116,7 +116,7 @@ kafka:
 
 ### Authentication
 
-The forwarding-service supports two ways for the service to authenticate itsself to MQTT and Kafka:
+The forwarding-service supports two ways for the service to authenticate itself to MQTT and Kafka:
 
 Client certificate authentication: See [TLS](#tls) above.
 
@@ -142,7 +142,7 @@ Note that SASL GSSAPI is currently not supported out-of-the-box. If you need it,
 
 ## Benchmark
 
-This repository includes a benchmark tool to measure the throughput of the forwarding service. The benchmark will publish a number of messages to an MQTT topic and then measure how long it takes for the messages to arrive on the corresponding kafka topic.
+This repository includes a benchmark tool to measure the throughput of the forwarding service. The benchmark will publish a number of messages to an MQTT topic and then measure how long it takes for the messages to arrive on the corresponding Kafka topic.
 
 To run it execute the following steps:
 
@@ -170,7 +170,7 @@ Performance was measured using the benchmark tool by repeatedly sending 1 millio
 
 Enabling the payload wrapping does not have any measurable impact on performance. Also HiveMQ is not the bottleneck, using QoS 1 the benchmark tool is able to publish about 9000 msg/s to the broker, so way more than the forwarding-service can process. Measuring the performance for QoS 0 was hard as at higher message rates messages get dropped (this is allowed in the specification and can happen in the broker or in the libraries on either the publisher or subscriber side due to overload). As such the provided number is one where no message drops happened. In some measurements about 10000 msg/s were possible without suffering losses, going higher increases the risk of dropped messages exponentially.
 
-We also created a Python implementation of the forwarding service (sourcecode not included in this repository) to compare performance and because python is more common in the company than Rust. We implemented two variants, one using the [confluent-kafka-python library](https://github.com/confluentinc/confluent-kafka-python) and one using the [kafka-python library](https://github.com/dpkp/kafka-python). At first glance the confluent library showed good peak performance of about 1200 msg/s for QoS 1. But when running the benchmark with more messages or several times then quite quickly the message rate drops significantly to about 300 msg/s. A flamegraph analysis showed that most of the time is spent in kafka library code (communicating with and waiting for the broker), so we assume the performance drop is due to some behaviour of the library. Switching out the confluent library with the third-pary kafka-python library gives a stable performance but slower than the confluent library peak performance.
+We also created a Python implementation of the forwarding service (source code not included in this repository) to compare performance and because python is more common in the company than Rust. We implemented two variants, one using the [confluent-kafka-python library](https://github.com/confluentinc/confluent-kafka-python) and one using the [kafka-python library](https://github.com/dpkp/kafka-python). At first glance the confluent library showed good peak performance of about 1200 msg/s for QoS 1. But when running the benchmark with more messages or several times then quite quickly the message rate drops significantly to about 300 msg/s. A flamegraph analysis showed that most of the time is spent in Kafka library code (communicating with and waiting for the broker), so we assume the performance drop is due to some behaviour of the library. Switching out the confluent library with the third-party `kafka-python` library gives a stable performance but slower than the confluent library peak performance.
 
 | QoS | confluent peak rate | confluent avg rate | kafka-python avg rate |
 |-----|---------------------|--------------------|-----------------------|
@@ -178,4 +178,4 @@ We also created a Python implementation of the forwarding service (sourcecode no
 | 1   |  1200 msg/s         | 300 msg/s          |  750 msg/s            |
 | 2   |  1000 msg/s         | 250 msg/s          |  600 msg/s            |
 
-Before we started the comparison we expected the python implementation to be slower than the rust variant due to python being an interpreted language. But we also assumed the performance drop would not be that much as the forwarding-service should be primarily I/O-bound so the slower interpreter performance should not have too much of an impact. The average performance of the confluent library was a bit of a disappointment as its peak performance was in line with our expectations. Considering kafka-python is a pure python library its performance is quite good.
+Before we started the comparison we expected the python implementation to be slower than the rust variant due to python being an interpreted language. But we also assumed the performance drop would not be that much as the forwarding-service should be primarily I/O-bound so the slower interpreter performance should not have too much of an impact. The average performance of the confluent library was a bit of a disappointment as its peak performance was in line with our expectations. Considering `kafka-python` is a pure python library its performance is quite good.

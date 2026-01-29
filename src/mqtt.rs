@@ -3,7 +3,7 @@ use crate::kafka::KafkaClient;
 use crate::metrics::{MetricLabels, COUNT_KAFKA_PUBLISHED, COUNT_MQTT_RECEIVED, MQTT_CONNECTED};
 use base64::prelude::*;
 use rumqttc::{
-    matches, AsyncClient, Event, EventLoop, Key, MqttOptions, Packet, Publish, QoS,
+    matches, AsyncClient, Event, EventLoop, MqttOptions, Packet, Publish, QoS,
     SubscribeFilter, TlsConfiguration, Transport,
 };
 use serde::{Deserialize, Serialize};
@@ -65,7 +65,7 @@ fn init_tls_transport(config: MqttTlsConfig) -> Transport {
         if let Some(client_key) = config.client_key {
             let client_key =
                 std::fs::read_to_string(client_key).expect("Could not read client key");
-            Some((client_cert.into_bytes(), Key::RSA(client_key.into_bytes())))
+            Some((client_cert.into_bytes(), client_key.into_bytes()))
         } else {
             None
         }
