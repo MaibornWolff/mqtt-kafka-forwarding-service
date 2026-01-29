@@ -1,4 +1,4 @@
-FROM clux/muslrust:1.75.0 as builder
+FROM clux/muslrust:1.93.0-stable as builder
 RUN mkdir /build
 WORKDIR /build
 COPY Cargo.toml Cargo.lock /build/
@@ -10,7 +10,7 @@ RUN --mount=type=cache,target=/build/target --mount=type=cache,target=/build/.ca
     cp /build/target/x86_64-unknown-linux-musl/release/forwarder /build/forwarder
 
 
-FROM alpine:3.18
+FROM alpine:3.22
 RUN mkdir /forwarding-service
 WORKDIR /forwarding-service
 COPY --from=builder /build/forwarder /forwarding-service/forwarder

@@ -14,20 +14,20 @@ opt-level = 3
 panic = "abort"
 
 [dependencies]
-tokio = { version = "1.35.1", features = ["rt-multi-thread", "macros", "sync"]}
-rumqttc = "0.23.0"
-rdkafka = {version="0.36.2", features=["ssl", "libz-static"]}
-serde = { version = "1.0", features = ["derive"] }
-serde_yaml = "0.9"
+tokio = { version = "1.49.0", features = ["rt-multi-thread", "macros", "sync"]}
+rumqttc = "0.25.1"
+rdkafka = {version="0.39.0", features=["ssl", "libz-static"]}
+serde = { version = "1.0.228", features = ["derive"] }
+serde_yaml = "0.9.34"
 yaml-rust = "0.4.5"
-serde_json = "1.0"
-log = "0.4.20"
-ctrlc = "3.4.2"
-base64 = "0.21.7"
-axum = {version="0.7.4"}
-prometheus-client = "0.22.0"
-lazy_static = "1.4.0"
-env_logger = "0.11.0"
+serde_json = "1.0.149"
+log = "0.4.29"
+ctrlc = "3.5.1"
+base64 = "0.22.1"
+axum = {version="0.8.8"}
+prometheus-client = "0.24.0"
+lazy_static = "1.5.0"
+env_logger = "0.11.8"
 
 
 [workspace]

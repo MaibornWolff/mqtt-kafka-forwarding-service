@@ -55,7 +55,7 @@ impl KafkaClient {
                 .await;
             self.producer.poll(Duration::from_secs(0));
             match delivery_status {
-                Ok((_partition, _offset)) => {
+                Ok(_delivery) => {
                     return;
                 }
                 Err((err, _msg)) => {
