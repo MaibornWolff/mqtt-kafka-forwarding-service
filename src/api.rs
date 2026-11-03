@@ -1,7 +1,7 @@
 use axum::{
-    http::{header::CONTENT_TYPE, HeaderMap, HeaderValue},
-    routing::get,
     Router,
+    http::{HeaderMap, HeaderValue, header::CONTENT_TYPE},
+    routing::get,
 };
 
 async fn root() -> &'static str {

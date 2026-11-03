@@ -3,8 +3,8 @@ use std::time::Duration;
 use crate::message::BenchmarkMessage;
 use base64::prelude::*;
 use rdkafka::{
-    consumer::{Consumer, StreamConsumer},
     ClientConfig, Message, Offset, TopicPartitionList,
+    consumer::{Consumer, StreamConsumer},
 };
 use serde::{Deserialize, Serialize};
 use tokio::time::Instant;
@@ -59,7 +59,10 @@ impl BenchmarkConsumer {
                         unwrap_message(msg.payload().unwrap(), wrapped_payload);
                     let last = message.last;
                     if count == 1 && message.id != 0 {
-                        println!("WARNING: First received message does have ID {} instead of 0. Message might be missing.\n", message.id);
+                        println!(
+                            "WARNING: First received message does have ID {} instead of 0. Message might be missing.\n",
+                            message.id
+                        );
                     }
                     messages.push(message);
                     if last {

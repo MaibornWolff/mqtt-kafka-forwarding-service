@@ -1,7 +1,7 @@
 use log::info;
 use std::sync::{
-    atomic::{AtomicBool, Ordering},
     Arc,
+    atomic::{AtomicBool, Ordering},
 };
 
 mod api;

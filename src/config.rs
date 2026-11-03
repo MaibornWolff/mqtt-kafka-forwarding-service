@@ -76,7 +76,7 @@ pub fn load_config() -> Config {
     f.read_to_string(&mut contents)
         .expect("something went wrong reading the config file");
     contents = parse_config(contents);
-    serde_yaml::from_str(&contents).expect("Could not parse config")
+    serde_saphyr::from_str(&contents).expect("Could not parse config")
 }
 
 enum ParseState {

@@ -1,10 +1,10 @@
-use crate::message::BenchmarkMessage;
 use crate::MQTT_TOPIC;
+use crate::message::BenchmarkMessage;
 use rumqttc::{AsyncClient, MqttOptions, QoS};
 use std::{
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };

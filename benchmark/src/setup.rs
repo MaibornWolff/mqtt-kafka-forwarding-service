@@ -1,8 +1,8 @@
 use crate::KAFKA_TOPIC;
 use rdkafka::{
+    ClientConfig,
     admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
     client::DefaultClientContext,
-    ClientConfig,
 };
 
 pub async fn create_stresstest_topic() {

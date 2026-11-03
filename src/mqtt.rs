@@ -1,16 +1,16 @@
 use crate::config::{ForwardingConfig, MqttConfig, MqttTlsConfig};
 use crate::kafka::KafkaClient;
-use crate::metrics::{MetricLabels, COUNT_KAFKA_PUBLISHED, COUNT_MQTT_RECEIVED, MQTT_CONNECTED};
+use crate::metrics::{COUNT_KAFKA_PUBLISHED, COUNT_MQTT_RECEIVED, MQTT_CONNECTED, MetricLabels};
 use base64::prelude::*;
 use rumqttc::{
-    matches, AsyncClient, Event, EventLoop, MqttOptions, Packet, Publish, QoS,
-    SubscribeFilter, TlsConfiguration, Transport,
+    AsyncClient, Event, EventLoop, MqttOptions, Packet, Publish, QoS, SubscribeFilter,
+    TlsConfiguration, Transport, matches,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering},
         Arc,
+        atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering},
     },
     time::Duration,
 };

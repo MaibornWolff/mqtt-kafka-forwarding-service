@@ -5,8 +5,8 @@ use simple_logger::SimpleLogger;
 use std::{
     collections::HashSet,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc,
+        atomic::{AtomicBool, Ordering},
     },
     time::Duration,
 };
@@ -47,7 +47,9 @@ async fn main() {
         .unwrap();
 
     let args: Args = argh::from_env();
-    if let Some(qos) = args.qos && qos > 2 {
+    if let Some(qos) = args.qos
+        && qos > 2
+    {
         eprintln!("ERROR: QoS must be between 0 and 2");
         return;
     }
